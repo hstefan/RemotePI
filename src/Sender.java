@@ -9,6 +9,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.ImageIcon;
@@ -33,7 +35,11 @@ public class Sender extends Agent {
 	    public void filesDropped( File[] files ) {
 		DFAgentDescription[] result = getAgents();
 		for(File f : files) {
-		    sendFile(f, result);
+                    try {
+                        sendFile(f, result);
+                    } catch (IOException ex) {
+                        Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+                    }
 		}
             }
         });
@@ -59,7 +65,7 @@ public class Sender extends Agent {
 	return null;
     }
     
-    public void sendFile(File file, DFAgentDescription[] agts) {
+    public void sendFile(File file, DFAgentDescription[] agts) throws IOException {
 	ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
 
 	msg.addUserDefinedParameter("start", "true");
@@ -70,17 +76,17 @@ public class Sender extends Agent {
 	}
 	send(msg);
 	try {
-	    FileInputStream fis = new FileInputStream(file);
+            ObjectInputStream oos = new ObjectInputStream(new FileInputStream(file));
 	    byte[] filecontent = new byte[4096];
 	    int bytes = -1;
 	    try {
 		msg.removeUserDefinedParameter("start");
 		while(true) {
-		   bytes = fis.read(filecontent);
+		   bytes = oos.read(filecontent);
 		   if(bytes <= 0) {
 		       msg.addUserDefinedParameter("stop", "true");
 		       System.out.println("Transmission concluded.");
-                       fis.close();
+                       oos.close();
 		       break;
 		   } else {
                         String f = new String(filecontent);

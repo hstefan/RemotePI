@@ -12,7 +12,9 @@ import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.TreeMap;
@@ -85,14 +87,14 @@ public class Receiver extends Agent {
 
     class ReceivingMessage extends Behaviour {
 	public ReceivingMessage(Agent agent, String filepath) {
-	    super(agent);
-	    try {
-		files = new TreeMap<String, FileOutputStream>();
-		FileOutputStream fos = new FileOutputStream(filepath);
-		files.put(filepath, fos);
-	    } catch (FileNotFoundException ex) {
-		Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-	    }
+            files = new TreeMap<String, ObjectOutputStream>();
+            ObjectOutputStream fos;
+            try {
+                fos = new ObjectOutputStream(new FileOutputStream(filepath));
+                files.put(filepath, fos);
+            } catch (IOException ex) {
+                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+            }
 	}
 
 	@Override
@@ -103,7 +105,7 @@ public class Receiver extends Agent {
 	       String filename = msg.getUserDefinedParameter("filepath");
 	       if(op != null && op.equals("true")) {
 		   System.out.println("Finished writting!");
-		   FileOutputStream fos = files.get(filename);
+		   ObjectOutputStream fos = files.get(filename);
 		   if(fos != null) {
 			try {
 			    fos.close();
@@ -117,7 +119,7 @@ public class Receiver extends Agent {
 		   }
 	       }
 	       else if(filename != null) {
-		   FileOutputStream fos = files.get(filename);
+		   ObjectOutputStream fos = files.get(filename);
 		   if (fos != null) {
 		       try {
 			   fos.write(msg.getContent().getBytes());
@@ -136,6 +138,6 @@ public class Receiver extends Agent {
 	    return files.isEmpty();
 	}
 
-	private TreeMap<String, FileOutputStream> files;
+	private TreeMap<String, ObjectOutputStream> files;
     }
 }
