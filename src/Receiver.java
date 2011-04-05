@@ -111,8 +111,9 @@ public class Receiver extends Agent {
 			    Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
 			}
 			files.remove(filename);
-			myAgent.removeBehaviour(this);
+			System.out.println("BEHAVIOUR SET TO WAITING");
 			myAgent.addBehaviour(new WaitingMessage(myAgent));
+			myAgent.removeBehaviour(this);
 			return;
 		   }
 	       }
@@ -127,7 +128,7 @@ public class Receiver extends Agent {
 		       }
 		   }
 	       }
-	   }
+	   } 
 	}
 
 	@Override

@@ -86,6 +86,7 @@ public class Sender extends Agent {
 		   if(bytes <= 0) {
 		       msg.addUserDefinedParameter("stop", "true");
 		       System.out.println("Transmission concluded.");
+		       send(msg);
                        oos.close();
 		       break;
 		   } else {
