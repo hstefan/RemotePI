@@ -9,8 +9,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.ImageIcon;
@@ -76,7 +76,7 @@ public class Sender extends Agent {
 	}
 	send(msg);
 	try {
-            ObjectInputStream oos = new ObjectInputStream(new FileInputStream(file));
+            FileInputStream oos = new FileInputStream(file);
 	    byte[] filecontent = new byte[4096];
 	    int bytes = -1;
 	    try {
@@ -89,8 +89,8 @@ public class Sender extends Agent {
                        oos.close();
 		       break;
 		   } else {
-                        String f = new String(filecontent);
-			msg.setContent(f);
+			String f = new String(filecontent);
+			msg.setContent(f.substring(0, bytes));
 			send(msg);
 		   }
 		}

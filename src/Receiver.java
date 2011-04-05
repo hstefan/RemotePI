@@ -10,11 +10,9 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FilterOutputStream;
 import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.TreeMap;
@@ -87,10 +85,10 @@ public class Receiver extends Agent {
 
     class ReceivingMessage extends Behaviour {
 	public ReceivingMessage(Agent agent, String filepath) {
-            files = new TreeMap<String, ObjectOutputStream>();
-            ObjectOutputStream fos;
+            files = new TreeMap<String, FileOutputStream>();
+            FileOutputStream fos;
             try {
-                fos = new ObjectOutputStream(new FileOutputStream(filepath));
+                fos = new FileOutputStream(filepath);
                 files.put(filepath, fos);
             } catch (IOException ex) {
                 Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
@@ -105,7 +103,7 @@ public class Receiver extends Agent {
 	       String filename = msg.getUserDefinedParameter("filepath");
 	       if(op != null && op.equals("true")) {
 		   System.out.println("Finished writting!");
-		   ObjectOutputStream fos = files.get(filename);
+		   FileOutputStream fos = files.get(filename);
 		   if(fos != null) {
 			try {
 			    fos.close();
@@ -119,11 +117,10 @@ public class Receiver extends Agent {
 		   }
 	       }
 	       else if(filename != null) {
-		   ObjectOutputStream fos = files.get(filename);
+		   OutputStream fos = files.get(filename);
 		   if (fos != null) {
 		       try {
 			   fos.write(msg.getContent().getBytes());
-			   System.out.println("Writting to");
 		       } catch (IOException ex) {
 			   System.err.println("Unable to write file.");
 			   Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
@@ -138,6 +135,6 @@ public class Receiver extends Agent {
 	    return files.isEmpty();
 	}
 
-	private TreeMap<String, ObjectOutputStream> files;
+	private TreeMap<String, FileOutputStream> files;
     }
 }
