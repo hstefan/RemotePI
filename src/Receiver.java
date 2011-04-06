@@ -10,6 +10,7 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -23,9 +24,8 @@ import java.util.TreeMap;
  */
 public class Receiver extends Agent {
 
-    /**
-     * @param args the command line arguments
-     */
+    public final String folder = "receive/" + getLocalName() + "/";
+
     public void setup() {
 	System.out.println("Starting Receiver Agent.");
 	System.out.println("Agent name: " + this.getAID().getName());
@@ -41,7 +41,7 @@ public class Receiver extends Agent {
             DFService.register(this, dfd);
         }
         catch(FIPAException fe) {
-            System.out.println("Impossible to register this agent in the yellow pages");
+            System.out.println(getName() + ": Impossible to register this agent in the yellow pages");
         }
     }
 
@@ -50,7 +50,7 @@ public class Receiver extends Agent {
             DFService.deregister(this);
         }
         catch (FIPAException fe) {
-            System.out.println("Couldn't remove this agent from the yellow pages.");
+            System.out.println(getName() + ": Couldn't remove this agent from the yellow pages.");
         }
     }
 
@@ -67,10 +67,13 @@ public class Receiver extends Agent {
 	    if (msg != null) {
 		String param = msg.getUserDefinedParameter("start");
 		if (param != null && param.equals("true")) {
+		    new File("receive/").mkdir();
+		    new File("receive/" + getLocalName() + "/").mkdir();
 		    String filepath = msg.getUserDefinedParameter("filepath");
 		    myAgent.addBehaviour(new ReceivingMessage(myAgent, filepath));
 		    myAgent.removeBehaviour(this);
 		    don = true;
+		    
 		}
 	    }
 	}
@@ -88,8 +91,8 @@ public class Receiver extends Agent {
             files = new TreeMap<String, FileOutputStream>();
             FileOutputStream fos;
             try {
-                fos = new FileOutputStream(filepath);
-                files.put(filepath, fos);
+		fos = new FileOutputStream("receive/" + getLocalName() + "/" + filepath);
+		files.put(filepath, fos);
             } catch (IOException ex) {
                 Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -102,7 +105,7 @@ public class Receiver extends Agent {
 	       String op = msg.getUserDefinedParameter("stop");
 	       String filename = msg.getUserDefinedParameter("filepath");
 	       if(op != null && op.equals("true")) {
-		   System.out.println("Finished writting!");
+		   System.out.println(getName() + " finished writting!");
 		   FileOutputStream fos = files.get(filename);
 		   if(fos != null) {
 			try {
@@ -111,7 +114,7 @@ public class Receiver extends Agent {
 			    Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
 			}
 			files.remove(filename);
-			System.out.println("BEHAVIOUR SET TO WAITING");
+			System.out.println(getName() + " is now waiting for new files.");
 			myAgent.addBehaviour(new WaitingMessage(myAgent));
 			myAgent.removeBehaviour(this);
 			return;
@@ -123,7 +126,7 @@ public class Receiver extends Agent {
 		       try {
 			   fos.write(msg.getContent().getBytes());
 		       } catch (IOException ex) {
-			   System.err.println("Unable to write file.");
+			   System.err.println(getName() + " is unable to write file.");
 			   Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
 		       }
 		   }

@@ -85,7 +85,7 @@ public class Sender extends Agent {
 		   bytes = oos.read(filecontent);
 		   if(bytes <= 0) {
 		       msg.addUserDefinedParameter("stop", "true");
-		       System.out.println("Transmission concluded.");
+		       System.out.println(getName() + ": Transmission concluded.");
 		       send(msg);
                        oos.close();
 		       break;
