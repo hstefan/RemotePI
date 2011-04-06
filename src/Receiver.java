@@ -73,9 +73,8 @@ public class Receiver extends Agent {
 		    myAgent.addBehaviour(new ReceivingMessage(myAgent, filepath));
 		    myAgent.removeBehaviour(this);
 		    don = true;
-		    
 		}
-	    }
+	    } 
 	}
 
 	@Override
