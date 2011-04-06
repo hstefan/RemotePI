@@ -24,7 +24,7 @@ public class Sender extends Agent {
     @Override
     public void setup()
     {        
-	JFrame frame = new JFrame("Black Hole File Transferer");
+	JFrame frame = new JFrame("Black Hole File Transferer - " + getName());
 	JPanel panel = new JPanel();
 	ImagePanel img_pan = new ImagePanel(new ImageIcon("images/background.png").getImage());
 
