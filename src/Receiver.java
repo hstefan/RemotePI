@@ -5,6 +5,7 @@
 
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
+import jade.core.behaviours.TickerBehaviour;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
@@ -17,6 +18,8 @@ import java.io.OutputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.TreeMap;
+import javax.crypto.Mac;
+import remotepi.Macros;
 
 /**
  *
@@ -29,7 +32,8 @@ public class Receiver extends Agent {
     public void setup() {
 	System.out.println("Starting Receiver Agent.");
 	System.out.println("Agent name: " + this.getAID().getName());
-	addBehaviour(new WaitingMessage(this));
+        ReceivingFile rec_agent = new ReceivingFile(this, folder);
+	addBehaviour(new FilePollingAgent(this, rec_agent));
 
 	DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
@@ -54,83 +58,52 @@ public class Receiver extends Agent {
         }
     }
 
-    class WaitingMessage extends Behaviour {
+    /*Agente que fica fazendo polling para verificar se há alguma mensagem de notificacao*/
+    class FilePollingAgent extends TickerBehaviour {
+        private ReceivingFile receiver;
+        boolean receiver_added;
+        
+        public FilePollingAgent(Agent agent, ReceivingFile rec_agent)
+        {
+            super(agent, 1000);
+            receiver = rec_agent;
+            receiver_added = false;
+        }
 
-	public WaitingMessage(Agent agent) {
-	    super(agent);
-	    don = false;
-	}
+        @Override
+        public void onTick() {
+            ACLMessage msg = receive();
+            if(msg != null) {
+                String requisition = msg.getUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
+                if(requisition != null && requisition.equals(Macros.START_REQUEST)) {
+                    if(!receiver_added) {
+                        myAgent.addBehaviour(receiver);
+                        receiver_added = true;
+                    }
+                    String filename = msg.getUserDefinedParameter(Macros.FILENAME_PARAM);
+                    if(filename != null) {
+                        receiver.onFileArrival(filename);
+                    }
+                }
+                else if (requisition != null && requisition.equals(Macros.STOP_REQUEST) ) {
+                    myAgent.removeBehaviour(receiver);
+                    receiver_added = false;
+                }
+            }
+        }
 
-	@Override
-	public void action() {
-	    ACLMessage msg = receive();
-	    if (msg != null) {
-		String param = msg.getUserDefinedParameter("start");
-		if (param != null && param.equals("true")) {
-		    new File("receive/").mkdir();
-		    new File("receive/" + getLocalName() + "/").mkdir();
-		    String filepath = msg.getUserDefinedParameter("filepath");
-		    myAgent.addBehaviour(new ReceivingMessage(myAgent, filepath));
-		    myAgent.removeBehaviour(this);
-		    don = true;
-		}
-	    } 
-	}
-
-	@Override
-	public boolean done() {
-	    return don;
-	}
-
-	private boolean don;
     }
 
-    class ReceivingMessage extends Behaviour {
-	public ReceivingMessage(Agent agent, String filepath) {
+    class ReceivingFile extends Behaviour {
+	
+        public ReceivingFile(Agent agent, String folder) {
             files = new TreeMap<String, FileOutputStream>();
-            FileOutputStream fos;
-            try {
-		fos = new FileOutputStream("receive/" + getLocalName() + "/" + filepath);
-		files.put(filepath, fos);
-            } catch (IOException ex) {
-                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            folder_name = folder;
+            new File(folder_name).mkdir();
 	}
 
 	@Override
-	public void action() {
-	   ACLMessage msg = receive();
-	   if (msg != null) {
-	       String op = msg.getUserDefinedParameter("stop");
-	       String filename = msg.getUserDefinedParameter("filepath");
-	       if(op != null && op.equals("true")) {
-		   System.out.println(getName() + " finished writting!");
-		   FileOutputStream fos = files.get(filename);
-		   if(fos != null) {
-			try {
-			    fos.close();
-			} catch (IOException ex) {
-			    Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-			}
-			files.remove(filename);
-			System.out.println(getName() + " is now waiting for new files.");
-			myAgent.addBehaviour(new WaitingMessage(myAgent));
-			myAgent.removeBehaviour(this);
-			return;
-		   }
-	       }
-	       else if(filename != null) {
-		   OutputStream fos = files.get(filename);
-		   if (fos != null) {
-		       try {
-			   fos.write(msg.getContent().getBytes());
-		       } catch (IOException ex) {
-			   System.err.println(getName() + " is unable to write file.");
-			   Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-		       }
-		   }
-	       }
-	   } 
+	public void action() { 
 	}
 
 	@Override
@@ -139,5 +112,15 @@ public class Receiver extends Agent {
 	}
 
 	private TreeMap<String, FileOutputStream> files;
+        private String folder_name;
+        private void onFileArrival(String filename) {
+            FileOutputStream fos;
+            try {
+		fos = new FileOutputStream(folder_name + "/" + filename);
+		files.put(filename, fos);
+            } catch (IOException ex) {
+                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
     }
 }
