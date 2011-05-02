@@ -3,27 +3,24 @@
  * and open the template in the editor.
  */
 
+import bhft.FileAlreadyExistsException;
+import bhft.FileIsNotOnTreeException;
 import jade.core.Agent;
-import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.TickerBehaviour;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
-import java.awt.RenderingHints.Key;
-import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.TreeMap;
+import bhft.Macros;
+import java.io.File;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.TreeMap;
-import javax.crypto.Mac;
-import remotepi.Macros;
+
 
 /**
  *
@@ -32,12 +29,13 @@ import remotepi.Macros;
 public class Receiver extends Agent {
 
     public final String folder = "receive/" + getLocalName() + "/";
+    public TreeMap<String, FileOutputStream> file_tree;
 
     public void setup() {
 	System.out.println("Starting Receiver Agent.");
 	System.out.println("Agent name: " + this.getAID().getName());
-        ReceivingFile rec_agent = new ReceivingFile(this, folder);
-	addBehaviour(new FilePollingAgent(this, rec_agent));
+	addBehaviour(new FilePollingBehaviour(this));
+        file_tree = new TreeMap<String, FileOutputStream>();
 
 	DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
@@ -62,16 +60,45 @@ public class Receiver extends Agent {
         }
     }
 
+    private void addFile(String filename) throws FileAlreadyExistsException {
+        if(file_tree.get(filename) != null) {
+            throw new FileAlreadyExistsException(filename);
+        } else {
+            try {
+                FileOutputStream fos = new FileOutputStream(folder + filename);
+                file_tree.put(filename, fos);
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    }
+
+    private void removeFile(String filename) throws FileIsNotOnTreeException {
+        if(file_tree.get(filename) == null)
+            throw new FileIsNotOnTreeException(filename);
+        else {
+            file_tree.remove(filename);
+        }
+    }
+    
+    public void writeToFile(String filename, byte[] buffer, int nbytes) throws FileIsNotOnTreeException {
+        FileOutputStream fos = file_tree.get(filename);
+        if(fos != null) {
+            try {
+                fos.write(buffer, 0, nbytes);
+            } catch (IOException ex) {
+                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } else {
+            throw new FileIsNotOnTreeException(filename);
+        }
+    }
+
     /*Agente que fica fazendo polling para verificar se há alguma mensagem de notificacao*/
-    class FilePollingAgent extends TickerBehaviour {
-        private ReceivingFile receiver;
-        boolean receiver_added;
-        
-        public FilePollingAgent(Agent agent, ReceivingFile rec_agent)
+    class FilePollingBehaviour extends TickerBehaviour {
+        public FilePollingBehaviour(Agent agent)
         {
             super(agent, 1000);
-            receiver = rec_agent;
-            receiver_added = false;
         }
 
         @Override
@@ -80,57 +107,33 @@ public class Receiver extends Agent {
             if(msg != null) {
                 String requisition = msg.getUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
                 if(requisition != null && requisition.equals(Macros.START_REQUEST)) {
-                    if(!receiver_added) {
-                        myAgent.addBehaviour(receiver);
-                        receiver_added = true;
-                    }
                     String filename = msg.getUserDefinedParameter(Macros.FILENAME_PARAM);
                     if(filename != null) {
-                        receiver.onFileArrival(filename);
+                        Receiver agnt = (Receiver)myAgent;
+                        if (agnt != null) { 
+                            try {
+                                agnt.addFile(filename);
+                            } catch (FileAlreadyExistsException ex) {
+                                System.out.println(ex);
+                            }
+                        }
                     }
                 }
                 else if (requisition != null && requisition.equals(Macros.STOP_REQUEST) ) {
-                    myAgent.removeBehaviour(receiver);
-                    receiver_added = false;
+                    String filename = msg.getUserDefinedParameter(Macros.FILENAME_PARAM);
+                    if(filename != null) {
+                        Receiver agnt = (Receiver)myAgent;
+                        if (agnt != null) {
+                            try {
+                                agnt.removeFile(filename);
+                            } catch (FileIsNotOnTreeException ex) {
+                                System.out.println(ex);
+                            }
+                        }
+                    }
                 }
             }
         }
 
-    }
-
-    class ReceivingFile extends Behaviour {
-	
-        public ReceivingFile(Agent agent, String folder) {
-            files = new TreeMap<String, FileOutputStream>();
-            folder_name = folder;
-            new File(folder_name).mkdir();
-	}
-
-	@Override
-	public void action() {
-            if(!files.isEmpty()) {
-                Set<String>  key_set = files.keySet();
-                for(String key : key_set) {
-                    
-                }  
-            }
-	}
-
-	@Override
-	public boolean done() {
-	    return false;
-	}
-
-	private TreeMap<String, FileOutputStream> files;
-        private String folder_name;
-        private void onFileArrival(String filename) {
-            FileOutputStream fos;
-            try {
-		fos = new FileOutputStream(folder_name + "/" + filename);
-		files.put(filename, fos);
-            } catch (IOException ex) {
-                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
     }
 }
