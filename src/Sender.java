@@ -17,8 +17,8 @@ import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
-import remotepi.FileDrop;
-import remotepi.ImagePanel;
+import bhft.FileDrop;
+import bhft.ImagePanel;
 
 public class Sender extends Agent {
     @Override

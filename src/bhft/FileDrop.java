@@ -1,4 +1,4 @@
-package remotepi;
+package bhft;
 
 import java.awt.datatransfer.DataFlavor;
 import java.io.BufferedReader;
