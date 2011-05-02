@@ -1,4 +1,5 @@
 
+import bhft.FileIsNotOnTreeException;
 import jade.core.Agent;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -9,8 +10,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.ImageIcon;
@@ -19,8 +18,18 @@ import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import bhft.FileDrop;
 import bhft.ImagePanel;
+import bhft.Macros;
+import jade.core.Location;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 public class Sender extends Agent {
+    
+    private byte[] filecontent = new byte[4096];
+    private Queue<Location> receivers = new ArrayDeque<Location>();
+    private String file_on_transmission = "";
+    private int n_bytes = 0;
+    
     @Override
     public void setup()
     {        
@@ -54,10 +63,10 @@ public class Sender extends Agent {
     public DFAgentDescription[] getAgents() {
 	DFAgentDescription template = new DFAgentDescription();
 	ServiceDescription sd = new ServiceDescription();
-	sd.setType("receiver");
+	sd.setType(Macros.RECEIVER_TYPE);
 	template.addServices(sd);
 	try {
-	    DFAgentDescription[] result = DFService.search(this, null);
+	    DFAgentDescription[] result = DFService.search(this, template);
 	    return result;
 	} catch (FIPAException ex) {
 	    Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
@@ -65,34 +74,56 @@ public class Sender extends Agent {
 	return null;
     }
     
+    @Override
+    public void afterMove() {
+        Queue<Agent> agents = null /* = pega agentes*/;
+        for (Agent ag : agents) {
+            if (ag instanceof Receiver) {
+                try {
+                    ((Receiver)ag).writeToFile(file_on_transmission, filecontent, n_bytes);
+                } catch (FileIsNotOnTreeException ex) {
+                    Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+        if(receivers.isEmpty()) {
+            return;
+        }
+        else {
+            Location l = receivers.element();
+            receivers.remove();
+            doMove(l);
+        }
+    }
+    
     public void sendFile(File file, DFAgentDescription[] agts) throws IOException {
 	ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
 
-	msg.addUserDefinedParameter("start", "true");
-	msg.addUserDefinedParameter("filepath", file.getName());
-
+	msg.addUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME, Macros.START_REQUEST);
+	msg.addUserDefinedParameter(Macros.FILENAME_PARAM, file.getName());
+      
 	for(DFAgentDescription ag : agts) {
 	    msg.addReceiver(ag.getName());
 	}
+        
 	send(msg);
 	try {
-            FileInputStream oos = new FileInputStream(file);
-	    byte[] filecontent = new byte[4096];
+            FileInputStream fis = new FileInputStream(file);
 	    int bytes = -1;
 	    try {
-		msg.removeUserDefinedParameter("start");
+		msg.removeUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
 		while(true) {
-		   bytes = oos.read(filecontent);
+		   bytes = fis.read(filecontent);
 		   if(bytes <= 0) {
-		       msg.addUserDefinedParameter("stop", "true");
+		       msg.addUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME, Macros.STOP_REQUEST);
 		       System.out.println(getName() + ": Transmission concluded.");
 		       send(msg);
-                       oos.close();
+                       fis.close();
 		       break;
 		   } else {
-			String f = new String(filecontent);
-			msg.setContent(f.substring(0, bytes));
-			send(msg);
+                       for(DFAgentDescription ag : agts) {
+                           
+                       }
 		   }
 		}
 	    } catch (IOException ex) {
