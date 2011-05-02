@@ -17,7 +17,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.TreeMap;
 import bhft.Macros;
-import java.io.File;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +30,7 @@ public class Receiver extends Agent {
     public final String folder = "receive/" + getLocalName() + "/";
     public TreeMap<String, FileOutputStream> file_tree;
 
+    @Override
     public void setup() {
 	System.out.println("Starting Receiver Agent.");
 	System.out.println("Agent name: " + this.getAID().getName());
@@ -51,6 +51,7 @@ public class Receiver extends Agent {
         }
     }
 
+    @Override
     public void takeDown() {
 	try {
             DFService.deregister(this);
