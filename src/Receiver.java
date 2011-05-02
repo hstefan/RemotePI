@@ -11,10 +11,14 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
+import java.awt.RenderingHints.Key;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.TreeMap;
@@ -103,12 +107,18 @@ public class Receiver extends Agent {
 	}
 
 	@Override
-	public void action() { 
+	public void action() {
+            if(!files.isEmpty()) {
+                Set<String>  key_set = files.keySet();
+                for(String key : key_set) {
+                    
+                }  
+            }
 	}
 
 	@Override
 	public boolean done() {
-	    return files.isEmpty();
+	    return false;
 	}
 
 	private TreeMap<String, FileOutputStream> files;
