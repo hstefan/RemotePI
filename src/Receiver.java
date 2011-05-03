@@ -16,9 +16,13 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.TreeMap;
-import bhft.Macros;
+import bhft.Macros;;import jade.domain.mobility.MobilityOntology;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import jade.content.lang.sl.SLCodec;
+import jade.content.onto.basic.Action;
+import jade.domain.mobility.MobileAgentDescription;
+import jade.domain.mobility.MoveAction;
 
 
 /**
@@ -29,6 +33,7 @@ public class Receiver extends Agent {
 
     public final String folder = "receive/" + getLocalName() + "/";
     public TreeMap<String, FileOutputStream> file_tree;
+    public boolean ontranstion = false;
 
     @Override
     public void setup() {
@@ -40,7 +45,7 @@ public class Receiver extends Agent {
 	DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
         ServiceDescription sd = new ServiceDescription();
-        sd.setType("receiver");
+        sd.setType(Macros.RECEIVER_TYPE);
         sd.setName("dark-hole-file-transfer");
         dfd.addServices(sd);
         try {
@@ -58,27 +63,6 @@ public class Receiver extends Agent {
         }
         catch (FIPAException fe) {
             System.out.println(getName() + ": Couldn't remove this agent from the yellow pages.");
-        }
-    }
-
-    private void addFile(String filename) throws FileAlreadyExistsException {
-        if(file_tree.get(filename) != null) {
-            throw new FileAlreadyExistsException(filename);
-        } else {
-            try {
-                FileOutputStream fos = new FileOutputStream(folder + filename);
-                file_tree.put(filename, fos);
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger(Receiver.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-    }
-
-    private void removeFile(String filename) throws FileIsNotOnTreeException {
-        if(file_tree.get(filename) == null)
-            throw new FileIsNotOnTreeException(filename);
-        else {
-            file_tree.remove(filename);
         }
     }
     
@@ -105,32 +89,47 @@ public class Receiver extends Agent {
         @Override
         public void onTick() {
             ACLMessage msg = receive();
+            if(msg != null && msg.getPerformative() == ACLMessage.REQUEST) {
+                send(msg);
+                System.out.println("Chegou ao lugar errado, reenviando.");
+                return;
+            }
             if(msg != null) {
                 String requisition = msg.getUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
-                if(requisition != null && requisition.equals(Macros.START_REQUEST)) {
-                    String filename = msg.getUserDefinedParameter(Macros.FILENAME_PARAM);
-                    if(filename != null) {
-                        Receiver agnt = (Receiver)myAgent;
-                        if (agnt != null) { 
+               
+                if (requisition != null && requisition.equals(Macros.ACCEPT_FILE)) {
+                    DFAgentDescription template = new DFAgentDescription();
+                    MobileAgentDescription mad = new MobileAgentDescription();
+                    ServiceDescription sd = new ServiceDescription();
+                    sd.setType(Macros.SENDER_AGENT);
+                    template.addServices(sd);
+                    try {
+                        System.out.println("Escrevendo pacotes.");
+                        DFAgentDescription[] result = DFService.search(myAgent, template);
+                        for(DFAgentDescription ds : result) {
+                            mad.setName(ds.getName());
+                            mad.setDestination(here());
+                            System.out.println("mandando um dos puto se copiar");
+                            
+                            MoveAction ma = new MoveAction();
+                            ma.setMobileAgentDescription(mad);
+                            Action na = new Action(ds.getName(), ma);
+          
+                            ACLMessage req = new ACLMessage(ACLMessage.REQUEST);
+                            req.addUserDefinedParameter("teste-dbg", "seria requisicao");
+                            req.setLanguage(new SLCodec().getName());
+                            req.setOntology(MobilityOntology.getInstance().getName());
+                            
                             try {
-                                agnt.addFile(filename);
-                            } catch (FileAlreadyExistsException ex) {
-                                System.out.println(ex);
+                                req.addReceiver(na.getActor());
+                                System.out.println("Mandando o agente se copiar");
+                                send(req);
+                            } catch (Exception ex) { 
+                                ex.printStackTrace(); 
                             }
                         }
-                    }
-                }
-                else if (requisition != null && requisition.equals(Macros.STOP_REQUEST) ) {
-                    String filename = msg.getUserDefinedParameter(Macros.FILENAME_PARAM);
-                    if(filename != null) {
-                        Receiver agnt = (Receiver)myAgent;
-                        if (agnt != null) {
-                            try {
-                                agnt.removeFile(filename);
-                            } catch (FileIsNotOnTreeException ex) {
-                                System.out.println(ex);
-                            }
-                        }
+                    } catch (FIPAException ex) {
+                        Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
             }

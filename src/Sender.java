@@ -1,5 +1,4 @@
 
-import bhft.FileIsNotOnTreeException;
 import jade.core.Agent;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -19,16 +18,20 @@ import javax.swing.JScrollPane;
 import bhft.FileDrop;
 import bhft.ImagePanel;
 import bhft.Macros;
+import jade.content.Concept;
+import jade.content.ContentElement;
+import jade.content.onto.basic.Action;
 import jade.core.Location;
-import java.util.ArrayDeque;
-import java.util.Queue;
+import jade.core.behaviours.TickerBehaviour;
+import jade.domain.mobility.MoveAction;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
 
 public class Sender extends Agent {
     
+    private ArrayList<byte[]> file_buffer = new ArrayList<byte[]>();
     private byte[] filecontent = new byte[4096];
-    private Queue<Location> receivers = new ArrayDeque<Location>();
-    private String file_on_transmission = "";
-    private int n_bytes = 0;
+    String filename;
     
     @Override
     public void setup()
@@ -58,6 +61,47 @@ public class Sender extends Agent {
 		(int)img_pan.getDimension().getHeight());
         frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
         frame.setVisible(true);
+        
+        addBehaviour(new TickerBehaviour(this, 20) {
+            @Override
+            public void onTick() {
+                ACLMessage msg = receive();
+                if (msg != null && msg.getPerformative() != ACLMessage.REQUEST) {
+                    System.out.println("Mensagem nao nula");
+                    String f = msg.getUserDefinedParameter("teste-dbg");
+                    if(f != null)
+                        System.out.println(f);
+                    send(msg);
+                }
+                if(msg != null && msg.getPerformative() == ACLMessage.REQUEST) {
+                    try {
+                        ContentElement content = getContentManager().extractContent(msg);
+                        Concept concept = ((Action)content).getAction();
+                        System.out.println("Me compiando-me");
+                        if (concept instanceof MoveAction) {
+                            MoveAction ca = (MoveAction)concept;
+                            Location l = ca.getMobileAgentDescription().getDestination();
+                            if(l != null) 
+                                doMove(l);
+                        }
+                    }
+                    catch (Exception ex) {}
+                }
+            }
+        });
+        
+        DFAgentDescription dfd = new DFAgentDescription();
+        dfd.setName(getAID());
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType(Macros.SENDER_AGENT);
+        sd.setName("dark-hole-file-transfer");
+        dfd.addServices(sd);
+        try {
+            DFService.register(this, dfd);
+        }
+        catch(FIPAException fe) {
+            System.out.println(getName() + ": Impossible to register this agent in the yellow pages");
+        }
     } 
 
     public DFAgentDescription[] getAgents() {
@@ -76,23 +120,18 @@ public class Sender extends Agent {
     
     @Override
     public void afterMove() {
-        Queue<Agent> agents = null /* = pega agentes*/;
-        for (Agent ag : agents) {
-            if (ag instanceof Receiver) {
+        System.out.println("did move");
+        try {
+            FileOutputStream fos = new FileOutputStream(filename);
+            for(int i = 0; i < file_buffer.size(); ++i) {
                 try {
-                    ((Receiver)ag).writeToFile(file_on_transmission, filecontent, n_bytes);
-                } catch (FileIsNotOnTreeException ex) {
+                    fos.write(file_buffer.get(i));
+                } catch (IOException ex) {
                     Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
-        }
-        if(receivers.isEmpty()) {
-            return;
-        }
-        else {
-            Location l = receivers.element();
-            receivers.remove();
-            doMove(l);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
@@ -119,11 +158,13 @@ public class Sender extends Agent {
 		       System.out.println(getName() + ": Transmission concluded.");
 		       send(msg);
                        fis.close();
+                       msg.removeUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
+                       msg.removeUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
+                       msg.addUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME, Macros.ACCEPT_FILE);
+                       send(msg);
 		       break;
 		   } else {
-                       for(DFAgentDescription ag : agts) {
-                           
-                       }
+                       file_buffer.add(filecontent.clone());
 		   }
 		}
 	    } catch (IOException ex) {
@@ -132,6 +173,5 @@ public class Sender extends Agent {
 	} catch (FileNotFoundException ex) {
 	    Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
 	}
-
     }
 }
