@@ -1,4 +1,3 @@
-
 import jade.core.Agent;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -20,22 +19,27 @@ import bhft.ImagePanel;
 import bhft.Macros;
 import jade.content.Concept;
 import jade.content.ContentElement;
+import jade.content.lang.sl.SLCodec;
 import jade.content.onto.basic.Action;
 import jade.core.Location;
 import jade.core.behaviours.TickerBehaviour;
-import jade.domain.mobility.MoveAction;
+import jade.domain.mobility.CloneAction;
+import jade.domain.mobility.MobilityOntology;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 
 public class Sender extends Agent {
     
     private ArrayList<byte[]> file_buffer = new ArrayList<byte[]>();
-    private byte[] filecontent = new byte[4096];
+    private transient byte[] filecontent = new byte[4096];
     String filename;
     
     @Override
     public void setup()
-    {        
+    {
+        getContentManager().registerLanguage(new SLCodec());
+        getContentManager().registerOntology(MobilityOntology.getInstance());
+
 	JFrame frame = new JFrame("Black Hole File Transferer - " + getName());
 	JPanel panel = new JPanel();
 	ImagePanel img_pan = new ImagePanel(new ImageIcon("images/background.png").getImage());
@@ -43,16 +47,17 @@ public class Sender extends Agent {
 	frame.getContentPane().add(img_pan);
         frame.getContentPane().add(new JScrollPane( panel ),
             java.awt.BorderLayout.CENTER );
-        new FileDrop( System.out, img_pan, /*dragBorder,*/ new FileDrop.Listener() {
-	    public void filesDropped( File[] files ) {
-		DFAgentDescription[] result = getAgents();
-		for(File f : files) {
+        FileDrop fileDrop = new FileDrop(System.out, img_pan, new FileDrop.Listener() {
+            public void filesDropped(File[] files) {
+                DFAgentDescription[] result = getAgents();
+                for (File f : files) {
                     try {
+                        filename = f.getName();
                         sendFile(f, result);
                     } catch (IOException ex) {
                         Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
                     }
-		}
+                }
             }
         });
 	
@@ -66,26 +71,33 @@ public class Sender extends Agent {
             @Override
             public void onTick() {
                 ACLMessage msg = receive();
-                if (msg != null && msg.getPerformative() != ACLMessage.REQUEST) {
+                if (msg != null) {
                     System.out.println("Mensagem nao nula");
-                    String f = msg.getUserDefinedParameter("teste-dbg");
-                    if(f != null)
-                        System.out.println(f);
-                    send(msg);
-                }
-                if(msg != null && msg.getPerformative() == ACLMessage.REQUEST) {
-                    try {
-                        ContentElement content = getContentManager().extractContent(msg);
-                        Concept concept = ((Action)content).getAction();
-                        System.out.println("Me compiando-me");
-                        if (concept instanceof MoveAction) {
-                            MoveAction ca = (MoveAction)concept;
-                            Location l = ca.getMobileAgentDescription().getDestination();
-                            if(l != null) 
-                                doMove(l);
+                    if(msg.getPerformative() != ACLMessage.REQUEST) {
+                        String f = msg.getUserDefinedParameter("teste-dbg");
+                        if(f != null)
+                            System.out.println(f);
+                        send(msg);
+                    }
+                    else {
+                        System.out.println("Mensagem para (Sender) ser clonado recebida!");
+                        try {
+                                System.out.println("token1");
+                            ContentElement content = getContentManager().extractContent(msg);
+                                System.out.println("token2");
+                            Concept concept = ((Action)content).getAction();
+                            if (concept instanceof CloneAction) {
+                                CloneAction ca = (CloneAction)concept;
+                                String new_name = ca.getNewName();
+                                Location l = ca.getMobileAgentDescription().getDestination();
+                                if(l != null)
+                                    myAgent.doClone(l, new_name);
+                            }
+                        }
+                        catch (Exception ex) {
+                            ex.printStackTrace();
                         }
                     }
-                    catch (Exception ex) {}
                 }
             }
         });
@@ -117,12 +129,18 @@ public class Sender extends Agent {
 	}
 	return null;
     }
-    
+
     @Override
-    public void afterMove() {
-        System.out.println("did move");
+    public void beforeClone() {
+        System.out.println("Cloning Sender...");
+    }
+
+    @Override
+    public void afterClone() {
+        System.out.println("Sender Cloned!");
         try {
             FileOutputStream fos = new FileOutputStream(filename);
+            System.out.println("Escrevendo " + file_buffer.size() + " blocos");
             for(int i = 0; i < file_buffer.size(); ++i) {
                 try {
                     fos.write(file_buffer.get(i));
@@ -133,6 +151,7 @@ public class Sender extends Agent {
         } catch (FileNotFoundException ex) {
             Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
+        doDelete();
     }
     
     public void sendFile(File file, DFAgentDescription[] agts) throws IOException {
