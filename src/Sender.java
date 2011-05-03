@@ -148,6 +148,11 @@ public class Sender extends Agent {
                     Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
+            try {
+                fos.close();
+            } catch (IOException ex) {
+                Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
+            }
         } catch (FileNotFoundException ex) {
             Logger.getLogger(Sender.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -166,6 +171,8 @@ public class Sender extends Agent {
         
 	send(msg);
 	try {
+            if(file_buffer.size() != 0)
+                file_buffer.clear();
             FileInputStream fis = new FileInputStream(file);
 	    int bytes = -1;
 	    try {
@@ -181,6 +188,7 @@ public class Sender extends Agent {
                        msg.removeUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME);
                        msg.addUserDefinedParameter(Macros.T_REQUEST_PARAM_NAME, Macros.ACCEPT_FILE);
                        send(msg);
+                       
 		       break;
 		   } else {
                        file_buffer.add(filecontent.clone());
